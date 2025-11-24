@@ -39,3 +39,12 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+
+<<<<<<< HEAD
+
+
+
+=======
+/backend/serviceAccountKey.json
+>>>>>>> 7149c41fe84dc0c94da47088fe3dcfe679b8a483

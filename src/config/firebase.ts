@@ -1,18 +1,30 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { initializeAuth, getReactNativePersistence } from 'firebase/auth';
+import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
+import ReactNativeAsyncStorage from '@react-native-async-storage/async-storage';
 
-// REPLACE WITH YOUR ACTUAL FIREBASE KEYS LATER
+// --------------------------------------------------------
+// KEEP YOUR EXISTING KEYS HERE
+// --------------------------------------------------------
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_AUTH_DOMAIN",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_STORAGE_BUCKET",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId: "YOUR_APP_ID"
-};
+  apiKey: "AIzaSyB5KprJ0PmMF2m_5IPyKoGk2wNuckdVpLg",
+  authDomain: "localconnect-94d31.firebaseapp.com",
+  projectId: "localconnect-94d31",
+  storageBucket: "localconnect-94d31.firebasestorage.app",
+  messagingSenderId: "367421152628",
+  appId: "1:367421152628:web:9e9b19261e66303afc6021"
+};;
+// --------------------------------------------------------
 
 const app = initializeApp(firebaseConfig);
 
-export const auth = getAuth(app);
-export const db = getFirestore(app);
+export const auth = initializeAuth(app, {
+  persistence: getReactNativePersistence(ReactNativeAsyncStorage)
+});
+
+// Enable Offline Persistence
+export const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({
+    tabManager: persistentMultipleTabManager()
+  })
+});
