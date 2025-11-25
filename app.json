@@ -8,7 +8,8 @@
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "jsEngine": "hermes",
-  
+
+    "scheme": "localconnect",
 
     "splash": {
       "image": "./assets/splash-icon.png",
@@ -22,13 +23,10 @@
     },
 
     "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
-      },
       "package": "com.localconnect.app",
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
+
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
@@ -36,11 +34,43 @@
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION"
       ],
+
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+
+      "intentFilters": [
+        {
+          "action": "android.intent.action.VIEW",
+          "data": [
+            {
+              "scheme": "geo"
+            }
+          ],
+          "category": [
+            "android.intent.category.DEFAULT",
+            "android.intent.category.BROWSABLE"
+          ]
+        },
+        {
+          "action": "android.intent.action.SEND",
+          "data": [
+            {
+              "mimeType": "text/plain"
+            }
+          ],
+          "category": [
+            "android.intent.category.DEFAULT"
+          ]
+        }
+      ],
+
       "config": {
-    "googleMaps": {
-      "apiKey": "2f764610a593ec67cef07781d1004a95717295dc"
-    }
-  }
+        "googleMaps": {
+          "apiKey": "2f764610a593ec67cef07781d1004a95717295dc"
+        }
+      }
     },
 
     "web": {
@@ -51,18 +81,17 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Allow LocalConnect to use your location to find nearby shops."
+          "locationAlwaysAndWhenInUsePermission":
+            "Allow LocalConnect to use your location to find nearby shops."
         }
       ]
-      
     ],
 
     "extra": {
       "eas": {
         "projectId": "d549055d-bb5f-4e9e-a325-37df2e6cc89f"
       },
-            "MAPTILER_KEY": "Pgf9L8n8GrmAIeaUA5fp"
-
+      "MAPTILER_KEY": "Pgf9L8n8GrmAIeaUA5fp"
     }
   }
 }

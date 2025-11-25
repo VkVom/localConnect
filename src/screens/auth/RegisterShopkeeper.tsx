@@ -1,206 +1,377 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView, ActivityIndicator } from 'react-native';
-import { useForm, Controller } from 'react-hook-form';
-import { createUserWithEmailAndPassword, sendEmailVerification, signOut } from 'firebase/auth'; // Import signOut
-import { auth, db } from '../../config/firebase';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { useNavigation } from '@react-navigation/native'; // Import navigation
-   import LocationPicker from '../../components/LocationPicker';
-    import { MaterialIcons } from '@expo/vector-icons';
+import React, { useState } from "react";
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  Alert,
+  ScrollView,
+  ActivityIndicator,
+} from "react-native";
+import { useForm, Controller } from "react-hook-form";
+import {
+  createUserWithEmailAndPassword,
+  sendEmailVerification,
+  signOut,
+} from "firebase/auth";
+import { auth, db } from "../../config/firebase";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { useNavigation } from "@react-navigation/native";
+
+import LocationSelectModal from "../../components/LocationSelectModal";
+import { MaterialIcons } from "@expo/vector-icons";
 
 export default function RegisterShopkeeper() {
-  const { control, handleSubmit, formState: { errors } } = useForm();
-  const [loading, setLoading] = useState(false);
+  const { control, handleSubmit } = useForm();
   const navigation = useNavigation<any>();
-   const [showMap, setShowMap] = useState(false);
-    const [location, setLocation] = useState<{latitude: number, longitude: number} | null>(null);
 
+  const [loading, setLoading] = useState(false);
+  const [location, setLocation] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
+
+  const [locModal, setLocModal] = useState(false);
+
+  // REGISTER LOGIC
   const onRegister = async (data: any) => {
+    if (!location) {
+      Alert.alert("Location Required", "Please select shop location.");
+      return;
+    }
+
     setLoading(true);
+
     try {
       // 1. Create Auth User
-      const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        data.email,
+        data.password
+      );
       const user = userCredential.user;
       const uid = user.uid;
 
       // 2. Create User Profile
-      await setDoc(doc(db, 'users', uid), {
-        uid: uid,
+      await setDoc(doc(db, "users", uid), {
+        uid,
         name: data.ownerName,
         email: data.email,
-        role: 'shopkeeper',
+        role: "shopkeeper",
         createdAt: serverTimestamp(),
       });
 
       // 3. Create Shop Profile
-      await setDoc(doc(db, 'shops', uid), {
+      await setDoc(doc(db, "shops", uid), {
         ownerId: uid,
         name: data.shopName,
         address: data.address,
         phone: data.phone,
         isOpen: false,
         createdAt: serverTimestamp(),
-       latitude: location ? location.latitude : 12.9716, 
-      longitude: location ? location.longitude : 77.5946,
+        latitude: location.latitude,
+        longitude: location.longitude,
       });
-      if (!location) { Alert.alert("Error", "Please select shop location"); return; };
 
       // 4. Send Verification Email
       await sendEmailVerification(user);
 
-      // 5. CRITICAL FIX: Log out so they don't auto-login
+      // 5. Log out
       await signOut(auth);
-      
-      Alert.alert(
-        "Verify Your Email", 
-        "A verification link has been sent to your email. Please verify it before logging in.",
-        [
-          { text: "OK", onPress: () => navigation.navigate('Login') }
-        ]
-      );
 
-    } catch (error: any) {
-      let errorMessage = error.message;
-      if (error.code === 'auth/email-already-in-use') {
-        errorMessage = 'This email is already registered.';
+      Alert.alert(
+        "Verify Email",
+        "A verification link has been sent. Please verify before logging in.",
+        [{ text: "OK", onPress: () => navigation.navigate("Login") }]
+      );
+    } catch (err: any) {
+      let msg = err.message;
+      if (err.code === "auth/email-already-in-use") {
+        msg = "This email is already registered.";
       }
-      Alert.alert("Registration Failed", errorMessage);
-    } finally {
-      setLoading(false);
+      Alert.alert("Registration Failed", msg);
     }
+
+    setLoading(false);
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <ScrollView style={styles.wrapper} contentContainerStyle={{ paddingBottom: 60 }}>
       <Text style={styles.header}>Partner Signup</Text>
-      <Text style={styles.subHeader}>Create your digital shop.</Text>
+      <Text style={styles.subHeader}>Register your shop & go digital.</Text>
 
-      {/* Section 1: Personal Info */}
-      <Text style={styles.sectionTitle}>1. Owner Details</Text>
-      
-      <View style={styles.inputGroup}>
-        <Text style={styles.label}>Owner Name</Text>
+      {/* SECTION 1 */}
+      <Text style={styles.section}>1. Owner Details</Text>
+
+      {/* Owner Name */}
+      <Field label="Owner Name">
         <Controller
           control={control}
-          rules={{ required: true }}
-          render={({ field: { onChange, onBlur, value } }) => (
-            <TextInput style={styles.input} onBlur={onBlur} onChangeText={onChange} value={value} placeholder="Your Name" />
-          )}
           name="ownerName"
+          rules={{ required: true }}
+          render={({ field: { onChange, value } }) => (
+            <TextInput
+              style={styles.input}
+              placeholder="Your Name"
+              value={value}
+              onChangeText={onChange}
+            />
+          )}
         />
-      </View>
+      </Field>
 
-      <View style={styles.inputGroup}>
-        <Text style={styles.label}>Email (Login ID)</Text>
+      {/* Email */}
+      <Field label="Email (Login ID)">
         <Controller
           control={control}
-          rules={{ required: true }}
-          render={({ field: { onChange, onBlur, value } }) => (
-            <TextInput style={styles.input} onBlur={onBlur} onChangeText={onChange} value={value} placeholder="shop@example.com" keyboardType="email-address" autoCapitalize="none" />
-          )}
           name="email"
+          rules={{ required: true }}
+          render={({ field: { onChange, value } }) => (
+            <TextInput
+              style={styles.input}
+              placeholder="shop@example.com"
+              value={value}
+              onChangeText={onChange}
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+          )}
         />
-      </View>
+      </Field>
 
-      <View style={styles.inputGroup}>
-        <Text style={styles.label}>Password</Text>
+      {/* Password */}
+      <Field label="Password">
         <Controller
           control={control}
-          rules={{ required: true, minLength: 6 }}
-          render={({ field: { onChange, onBlur, value } }) => (
-            <TextInput style={styles.input} onBlur={onBlur} onChangeText={onChange} value={value} placeholder="******" secureTextEntry />
-          )}
           name="password"
+          rules={{ required: true, minLength: 6 }}
+          render={({ field: { onChange, value } }) => (
+            <TextInput
+              style={styles.input}
+              placeholder="******"
+              secureTextEntry
+              value={value}
+              onChangeText={onChange}
+            />
+          )}
         />
-      </View>
+      </Field>
 
-      {/* Section 2: Shop Details */}
-      <Text style={styles.sectionTitle}>2. Shop Details</Text>
+      {/* SECTION 2 */}
+      <Text style={styles.section}>2. Shop Details</Text>
 
-      <View style={styles.inputGroup}>
-        <Text style={styles.label}>Shop Name</Text>
+      {/* Shop Name */}
+      <Field label="Shop Name">
         <Controller
           control={control}
-          rules={{ required: true }}
-          render={({ field: { onChange, onBlur, value } }) => (
-            <TextInput style={styles.input} onBlur={onBlur} onChangeText={onChange} value={value} placeholder="My Kirana Store" />
-          )}
           name="shopName"
+          rules={{ required: true }}
+          render={({ field: { onChange, value } }) => (
+            <TextInput
+              style={styles.input}
+              placeholder="My Kirana Store"
+              value={value}
+              onChangeText={onChange}
+            />
+          )}
         />
-      </View>
+      </Field>
 
-      <View style={styles.inputGroup}>
-        <Text style={styles.label}>Shop Address</Text>
+      {/* Address */}
+      <Field label="Shop Address">
         <Controller
           control={control}
-          rules={{ required: true }}
-          render={({ field: { onChange, onBlur, value } }) => (
-            <TextInput style={[styles.input, {height: 80}]} onBlur={onBlur} onChangeText={onChange} value={value} placeholder="Full address..." multiline />
-          )}
           name="address"
-        />
-      </View>
-      <View style={styles.inputGroup}>
-          <Text style={styles.label}>Shop Location</Text>
-          
-          {location ? (
-             <View style={styles.locationPreview}>
-               <MaterialIcons name="location-on" size={20} color="#16a34a" />
-               <Text style={styles.locationText}>Location Selected</Text>
-               <TouchableOpacity onPress={() => setShowMap(true)}>
-                 <Text style={styles.changeLink}>Change</Text>
-               </TouchableOpacity>
-             </View>
-          ) : (
-            <TouchableOpacity style={styles.mapButton} onPress={() => setShowMap(true)}>
-              <MaterialIcons name="map" size={20} color="#2563eb" />
-              <Text style={styles.mapButtonText}>Pick on Map</Text>
-            </TouchableOpacity>
+          rules={{ required: true }}
+          render={({ field: { onChange, value } }) => (
+            <TextInput
+              style={[styles.input, { height: 90 }]}
+              placeholder="Full address..."
+              multiline
+              value={value}
+              onChangeText={onChange}
+            />
           )}
-        </View>
- <LocationPicker 
-          visible={showMap} 
-          onClose={() => setShowMap(false)}
-          onConfirm={(loc) => setLocation(loc)}
         />
+      </Field>
 
-      <View style={styles.inputGroup}>
-        <Text style={styles.label}>Contact Number</Text>
+      {/* LOCATION PICKER */}
+      <Field label="Shop Location">
+        {location ? (
+          <TouchableOpacity
+            style={styles.locationSelected}
+            onPress={() => setLocModal(true)}
+          >
+            <MaterialIcons name="location-on" size={20} color="#0f766e" />
+            <Text style={styles.locationText}>
+              {location.latitude.toFixed(5)}, {location.longitude.toFixed(5)}
+            </Text>
+            <Text style={styles.changeText}>Change</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={styles.pickBtn}
+            onPress={() => setLocModal(true)}
+          >
+            <MaterialIcons name="map" size={20} color="#2563eb" />
+            <Text style={styles.pickBtnText}>Select Location</Text>
+          </TouchableOpacity>
+        )}
+      </Field>
+
+      {/* Contact */}
+      <Field label="Contact Number">
         <Controller
           control={control}
-          rules={{ required: true }}
-          render={({ field: { onChange, onBlur, value } }) => (
-            <TextInput style={styles.input} onBlur={onBlur} onChangeText={onChange} value={value} placeholder="9876543210" keyboardType="phone-pad" />
-          )}
           name="phone"
+          rules={{ required: true }}
+          render={({ field: { onChange, value } }) => (
+            <TextInput
+              style={styles.input}
+              placeholder="9876543210"
+              keyboardType="phone-pad"
+              value={value}
+              onChangeText={onChange}
+            />
+          )}
         />
-      </View>
+      </Field>
 
-      <TouchableOpacity 
-        style={styles.button} 
+      {/* Register Button */}
+      <TouchableOpacity
+        style={styles.button}
         onPress={handleSubmit(onRegister)}
         disabled={loading}
       >
-        {loading ? <ActivityIndicator color="white" /> : <Text style={styles.btnText}>Register Shop</Text>}
+        {loading ? (
+          <ActivityIndicator color="white" />
+        ) : (
+          <Text style={styles.buttonText}>Register Shop</Text>
+        )}
       </TouchableOpacity>
+
+      {/* LOCATION SELECT MODAL */}
+      <LocationSelectModal
+        visible={locModal}
+        onClose={() => setLocModal(false)}
+        onSelect={(loc) => setLocation(loc)}
+      />
     </ScrollView>
   );
 }
 
+/* FIELD WRAPPER */
+function Field(props: any) {
+  return (
+    <View style={{ marginBottom: 20 }}>
+      <Text style={styles.label}>{props.label}</Text>
+      {props.children}
+    </View>
+  );
+}
+
+/* STYLES */
 
 const styles = StyleSheet.create({
-  container: { flexGrow: 1, padding: 20, backgroundColor: '#fff' },
-  header: { fontSize: 28, fontWeight: '800', color: '#d97706', marginBottom: 5, marginTop: 40 },
-  subHeader: { fontSize: 16, color: '#b45309', marginBottom: 30 },
-  sectionTitle: { fontSize: 18, fontWeight: '700', color: '#334155', marginTop: 10, marginBottom: 15, borderBottomWidth: 1, borderBottomColor: '#e2e8f0', paddingBottom: 5 },
-  inputGroup: { marginBottom: 20 },
-  label: { fontSize: 14, fontWeight: '600', color: '#475569', marginBottom: 8 },
-  input: { borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 10, padding: 15, fontSize: 16, backgroundColor: '#fff' },
-  button: { backgroundColor: '#d97706', padding: 18, borderRadius: 12, alignItems: 'center', marginTop: 20, marginBottom: 40 },
-  btnText: { color: 'white', fontWeight: 'bold', fontSize: 16 },
-   mapButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#dbeafe', padding: 15, borderRadius: 10, borderWidth: 1, borderColor: '#bfdbfe' },
-    mapButtonText: { color: '#2563eb', fontWeight: 'bold', marginLeft: 8 },
-    locationPreview: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#dcfce7', padding: 15, borderRadius: 10, borderWidth: 1, borderColor: '#86efac' },
-    locationText: { marginLeft: 8, color: '#15803d', fontWeight: 'bold', flex: 1 },
-    changeLink: { color: '#166534', textDecorationLine: 'underline' }
+  wrapper: {
+    flex: 1,
+    backgroundColor: "#ffffff",
+    padding: 22,
+    paddingTop: 50,
+  },
+
+  header: {
+    fontSize: 32,
+    fontWeight: "800",
+    color: "#d97706",
+  },
+  subHeader: {
+    fontSize: 15,
+    color: "#b45309",
+    marginBottom: 25,
+  },
+
+  section: {
+    fontSize: 19,
+    fontWeight: "700",
+    color: "#334155",
+    marginTop: 20,
+    marginBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#e2e8f0",
+    paddingBottom: 4,
+  },
+
+  label: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#475569",
+    marginBottom: 6,
+  },
+
+  input: {
+    borderWidth: 1,
+    borderColor: "#cbd5e1",
+    borderRadius: 10,
+    padding: 14,
+    fontSize: 16,
+    backgroundColor: "white",
+  },
+
+  pickBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#bfdbfe",
+    backgroundColor: "#dbeafe",
+    justifyContent: "center",
+    gap: 10,
+  },
+
+  pickBtnText: {
+    fontSize: 15,
+    color: "#2563eb",
+    fontWeight: "700",
+  },
+
+  locationSelected: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 14,
+    backgroundColor: "#dcfce7",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#86efac",
+    gap: 8,
+  },
+
+  locationText: {
+    flex: 1,
+    color: "#166534",
+    fontWeight: "700",
+  },
+
+  changeText: {
+    color: "#166534",
+    fontWeight: "bold",
+    textDecorationLine: "underline",
+  },
+
+  button: {
+    backgroundColor: "#d97706",
+    padding: 18,
+    borderRadius: 12,
+    alignItems: "center",
+    marginTop: 10,
+    marginBottom: 40,
+  },
+
+  buttonText: {
+    color: "white",
+    fontWeight: "800",
+    fontSize: 16,
+  },
 });

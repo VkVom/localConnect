@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   FlatList,
   ActivityIndicator,
-  Modal,
   Alert,
 } from "react-native";
 
@@ -15,13 +14,10 @@ import { collection, onSnapshot } from "firebase/firestore";
 
 import ShopCard, { Shop } from "../../components/ShopCard";
 
-import MapView, { Marker, UrlTile } from "react-native-maps";
 import * as Location from "expo-location";
-import Constants from "expo-constants";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
-
-const MAPTILER_KEY = Constants.expoConfig?.extra?.MAPTILER_KEY;
+import { SafeAreaView } from "react-native-safe-area-context";
 
 interface ShopWithLoc extends Shop {
   latitude?: number;
@@ -34,15 +30,20 @@ export default function CustomerHome() {
 
   const [shops, setShops] = useState<ShopWithLoc[]>([]);
   const [loading, setLoading] = useState(true);
-  const [mapVisible, setMapVisible] = useState(false);
-  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [userLocation, setUserLocation] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
 
-  // Request Location
+  // Request Location Permission
   useEffect(() => {
     const getLocation = async () => {
       let { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== "granted") {
-        Alert.alert("Permission needed", "Location permission is required to show nearby shops.");
+        Alert.alert(
+          "Permission needed",
+          "Location permission is required to show nearby shops."
+        );
         return;
       }
 
@@ -56,7 +57,13 @@ export default function CustomerHome() {
     getLocation();
   }, []);
 
-  const calcDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+  // Calculate Distance
+  const calcDistance = (
+    lat1: number,
+    lon1: number,
+    lat2: number,
+    lon2: number
+  ) => {
     const R = 6371;
     const dLat = ((lat2 - lat1) * Math.PI) / 180;
     const dLon = ((lon2 - lon1) * Math.PI) / 180;
@@ -70,7 +77,7 @@ export default function CustomerHome() {
     return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
   };
 
-  // Realtime shops listener
+  // Fetch shops
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "shops"), (snap) => {
       const list: ShopWithLoc[] = [];
@@ -90,7 +97,9 @@ export default function CustomerHome() {
         list.push({ ...data, id: doc.id });
       });
 
-      list.sort((a, b) => (a.distance ?? 9999) - (b.distance ?? 9999));
+      list.sort(
+        (a, b) => (a.distance ?? 9999) - (b.distance ?? 9999)
+      );
 
       setShops(list);
       setLoading(false);
@@ -99,37 +108,24 @@ export default function CustomerHome() {
     return () => unsub();
   }, [userLocation]);
 
-  if (!MAPTILER_KEY) {
-    return (
-      <View style={styles.loader}>
-        <Text style={{ color: "red" }}>❗ MAPTILER_KEY missing in app.json</Text>
-      </View>
-    );
-  }
-
   if (loading || !userLocation) {
     return (
-      <View style={styles.loader}>
+      <SafeAreaView style={styles.loader}>
         <ActivityIndicator size="large" />
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       {/* HEADER */}
       <View style={styles.header}>
         <Text style={styles.title}>Nearby Shops</Text>
 
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 18 }}>
-          <TouchableOpacity onPress={() => setMapVisible(true)}>
-            <MaterialIcons name="map" size={28} color="#007AFF" />
-          </TouchableOpacity>
-
-          <TouchableOpacity onPress={() => auth.signOut()}>
-            <MaterialIcons name="logout" size={28} color="red" />
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity onPress={() => auth.signOut()} style={styles.logoutBtn}>
+          <MaterialIcons name="logout" size={20} color="#d9534f" />
+          <Text style={styles.logoutText}>Logout</Text>
+        </TouchableOpacity>
       </View>
 
       {/* SHOP LIST */}
@@ -139,73 +135,60 @@ export default function CustomerHome() {
         renderItem={({ item }) => (
           <ShopCard
             shop={item}
-            onPress={() => navigation.navigate("ShopDetails" as never, { shop: item } as never)}
+            onPress={() =>
+              navigation.navigate(
+                "ShopDetails" as never,
+                { shop: item } as never
+              )
+            }
           />
         )}
-        contentContainerStyle={{ paddingHorizontal: 16 }}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40 }}
       />
-
-      {/* MAP MODAL */}
-      <Modal visible={mapVisible} animationType="slide">
-        <View style={{ flex: 1 }}>
-          <MapView
-            style={{ flex: 1 }}
-            initialRegion={{
-              latitude: userLocation.latitude,
-              longitude: userLocation.longitude,
-              latitudeDelta: 0.04,
-              longitudeDelta: 0.04,
-            }}
-          >
-            <UrlTile
-              urlTemplate={`https://api.maptiler.com/maps/streets/{z}/{x}/{y}.png?key=${MAPTILER_KEY}`}
-              maximumZ={20}
-              tileSize={512}
-            />
-
-            <Marker coordinate={userLocation} pinColor="blue" title="You" />
-
-            {shops.map((shop) =>
-              shop.latitude && shop.longitude ? (
-                <Marker
-                  key={shop.id}
-                  coordinate={{ latitude: shop.latitude, longitude: shop.longitude }}
-                  title={shop.name}
-                  description={shop.isOpen ? "Open Now" : "Closed"}
-                  pinColor={shop.isOpen ? "green" : "red"}
-                />
-              ) : null
-            )}
-          </MapView>
-
-          <TouchableOpacity style={styles.closeMapBtn} onPress={() => setMapVisible(false)}>
-            <MaterialIcons name="close" size={28} color="white" />
-          </TouchableOpacity>
-        </View>
-      </Modal>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "white" },
-  loader: { flex: 1, justifyContent: "center", alignItems: "center" },
 
-  header: {
-    padding: 20,
-    flexDirection: "row",
-    justifyContent: "space-between",
+  loader: {
+    flex: 1,
+    justifyContent: "center",
     alignItems: "center",
   },
 
-  title: { fontSize: 22, fontWeight: "700", color: "#111" },
+  header: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 18,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "white",
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+  },
 
-  closeMapBtn: {
-    position: "absolute",
-    top: 40,
-    right: 20,
-    backgroundColor: "black",
-    padding: 10,
-    borderRadius: 40,
+  title: { 
+    fontSize: 24, 
+    fontWeight: "700", 
+    color: "#111" 
+  },
+
+  logoutBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    backgroundColor: "#f8d7da",
+    borderRadius: 8,
+  },
+
+  logoutText: {
+    color: "#d9534f",
+    fontWeight: "600",
+    marginLeft: 6,
+    fontSize: 14,
   },
 });
