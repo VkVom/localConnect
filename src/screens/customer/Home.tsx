@@ -1,14 +1,28 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, ActivityIndicator, Modal, Dimensions, Alert } from 'react-native';
-import { auth, db } from '../../config/firebase';
-import { collection, onSnapshot } from 'firebase/firestore';
-import ShopCard, { Shop } from '../../components/ShopCard';
-import MapView, { Marker, UrlTile } from 'react-native-maps'; // Added UrlTile
-import * as Location from 'expo-location';
-import { MaterialIcons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import React, { useEffect, useState } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  FlatList,
+  ActivityIndicator,
+  Modal,
+  Alert,
+} from "react-native";
 
-// Extend Shop to include location
+import { auth, db } from "../../config/firebase";
+import { collection, onSnapshot } from "firebase/firestore";
+
+import ShopCard, { Shop } from "../../components/ShopCard";
+
+import MapView, { Marker, UrlTile } from "react-native-maps";
+import * as Location from "expo-location";
+import Constants from "expo-constants";
+import { MaterialIcons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
+
+const MAPTILER_KEY = Constants.expoConfig?.extra?.MAPTILER_KEY;
+
 interface ShopWithLoc extends Shop {
   latitude?: number;
   longitude?: number;
@@ -17,163 +31,156 @@ interface ShopWithLoc extends Shop {
 
 export default function CustomerHome() {
   const navigation = useNavigation<any>();
+
   const [shops, setShops] = useState<ShopWithLoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [mapVisible, setMapVisible] = useState(false);
-  const [userLocation, setUserLocation] = useState<Location.LocationObject | null>(null);
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
 
-  // Helper: Calculate Distance (Haversine Formula)
-  const getDistanceFromLatLonInKm = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-    var R = 6371; 
-    var dLat = deg2rad(lat2 - lat1);
-    var dLon = deg2rad(lon2 - lon1);
-    var a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
-      Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    var d = R * c;
-    return parseFloat(d.toFixed(1));
-  };
-
-  const deg2rad = (deg: number) => {
-    return deg * (Math.PI / 180);
-  };
-
-  // 1. Get User Location
+  // Request Location
   useEffect(() => {
-    (async () => {
+    const getLocation = async () => {
       let { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission Denied', 'Allow location access to find nearby shops.');
+      if (status !== "granted") {
+        Alert.alert("Permission needed", "Location permission is required to show nearby shops.");
         return;
       }
 
-      let location = await Location.getCurrentPositionAsync({});
-      setUserLocation(location);
-    })();
+      let loc = await Location.getCurrentPositionAsync({});
+      setUserLocation({
+        latitude: loc.coords.latitude,
+        longitude: loc.coords.longitude,
+      });
+    };
+
+    getLocation();
   }, []);
 
-  // 2. Fetch and Sort Shops
+  const calcDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const R = 6371;
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLon = ((lon2 - lon1) * Math.PI) / 180;
+
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(lat1 * Math.PI / 180) *
+        Math.cos(lat2 * Math.PI / 180) *
+        Math.sin(dLon / 2) ** 2;
+
+    return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+  };
+
+  // Realtime shops listener
   useEffect(() => {
-    const shopsRef = collection(db, 'shops');
-    const unsubscribe = onSnapshot(shopsRef, (snapshot) => {
-      const shopList: ShopWithLoc[] = [];
-      
-      snapshot.forEach((doc) => {
-        const data = doc.data();
-        let dist = 0;
+    const unsub = onSnapshot(collection(db, "shops"), (snap) => {
+      const list: ShopWithLoc[] = [];
+
+      snap.forEach((doc) => {
+        const data = doc.data() as ShopWithLoc;
 
         if (userLocation && data.latitude && data.longitude) {
-          dist = getDistanceFromLatLonInKm(
-            userLocation.coords.latitude,
-            userLocation.coords.longitude,
+          data.distance = calcDistance(
+            userLocation.latitude,
+            userLocation.longitude,
             data.latitude,
             data.longitude
           );
         }
 
-        shopList.push({ 
-          id: doc.id, 
-          ...data,
-          distance: dist
-        } as ShopWithLoc);
+        list.push({ ...data, id: doc.id });
       });
 
-      if (userLocation) {
-        shopList.sort((a, b) => (a.distance || 0) - (b.distance || 0));
-      }
+      list.sort((a, b) => (a.distance ?? 9999) - (b.distance ?? 9999));
 
-      setShops(shopList);
+      setShops(list);
       setLoading(false);
     });
-    return () => unsubscribe();
-  }, [userLocation]); 
+
+    return () => unsub();
+  }, [userLocation]);
+
+  if (!MAPTILER_KEY) {
+    return (
+      <View style={styles.loader}>
+        <Text style={{ color: "red" }}>❗ MAPTILER_KEY missing in app.json</Text>
+      </View>
+    );
+  }
+
+  if (loading || !userLocation) {
+    return (
+      <View style={styles.loader}>
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
+      {/* HEADER */}
       <View style={styles.header}>
-        <Text style={styles.title}>LocalConnect</Text>
-        <View style={{flexDirection: 'row', gap: 15}}>
-          <TouchableOpacity onPress={() => setMapVisible(true)} style={styles.iconBtn}>
-            <MaterialIcons name="map" size={24} color="#007AFF" />
+        <Text style={styles.title}>Nearby Shops</Text>
+
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 18 }}>
+          <TouchableOpacity onPress={() => setMapVisible(true)}>
+            <MaterialIcons name="map" size={28} color="#007AFF" />
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => auth.signOut()} style={styles.iconBtn}>
-            <MaterialIcons name="logout" size={24} color="#ef4444" />
+
+          <TouchableOpacity onPress={() => auth.signOut()}>
+            <MaterialIcons name="logout" size={28} color="red" />
           </TouchableOpacity>
         </View>
       </View>
 
-      <Text style={styles.sectionTitle}>Nearby Shops</Text>
+      {/* SHOP LIST */}
+      <FlatList
+        data={shops}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => (
+          <ShopCard
+            shop={item}
+            onPress={() => navigation.navigate("ShopDetails" as never, { shop: item } as never)}
+          />
+        )}
+        contentContainerStyle={{ paddingHorizontal: 16 }}
+      />
 
-      {loading ? (
-        <ActivityIndicator size="large" color="#007AFF" />
-      ) : (
-        <FlatList
-          data={shops}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <TouchableOpacity 
-              activeOpacity={0.9}
-              onPress={() => navigation.navigate('ShopDetails', { shop: item })}
-            >
-              <ShopCard shop={item} />
-              {/* Show Distance Badge */}
-              {item.distance ? (
-                <View style={styles.distBadge}>
-                  <Text style={styles.distText}>{item.distance} km away</Text>
-                </View>
-              ) : null}
-            </TouchableOpacity>
-          )}
-          contentContainerStyle={styles.list}
-        />
-      )}
-
-      {/* THE MAP MODAL */}
+      {/* MAP MODAL */}
       <Modal visible={mapVisible} animationType="slide">
-        <View style={styles.mapContainer}>
-          <TouchableOpacity style={styles.closeBtn} onPress={() => setMapVisible(false)}>
-            <MaterialIcons name="close" size={24} color="black" />
-            <Text style={styles.closeText}>Close Map</Text>
-          </TouchableOpacity>
-          
-          <MapView 
-            style={styles.map}
-            showsUserLocation={true}
+        <View style={{ flex: 1 }}>
+          <MapView
+            style={{ flex: 1 }}
             initialRegion={{
-              latitude: userLocation?.coords.latitude || 12.9716,
-              longitude: userLocation?.coords.longitude || 77.5946,
-              latitudeDelta: 0.0922,
-              longitudeDelta: 0.0421,
+              latitude: userLocation.latitude,
+              longitude: userLocation.longitude,
+              latitudeDelta: 0.04,
+              longitudeDelta: 0.04,
             }}
           >
-            {/* OpenStreetMap Tile Layer */}
             <UrlTile
-              urlTemplate="http://c.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              maximumZ={19}
-              flipY={false}
+              urlTemplate={`https://api.maptiler.com/maps/streets/{z}/{x}/{y}.png?key=${MAPTILER_KEY}`}
+              maximumZ={20}
+              tileSize={512}
             />
 
-            {shops.map((shop) => (
+            <Marker coordinate={userLocation} pinColor="blue" title="You" />
+
+            {shops.map((shop) =>
               shop.latitude && shop.longitude ? (
                 <Marker
                   key={shop.id}
-                  coordinate={{
-                    latitude: shop.latitude,
-                    longitude: shop.longitude
-                  }}
+                  coordinate={{ latitude: shop.latitude, longitude: shop.longitude }}
                   title={shop.name}
                   description={shop.isOpen ? "Open Now" : "Closed"}
-                  // Removed pinColor as it's Google specific, using default red pin
-                  onCalloutPress={() => {
-                    setMapVisible(false);
-                    navigation.navigate('ShopDetails', { shop: shop });
-                  }}
+                  pinColor={shop.isOpen ? "green" : "red"}
                 />
               ) : null
-            ))}
+            )}
           </MapView>
+
+          <TouchableOpacity style={styles.closeMapBtn} onPress={() => setMapVisible(false)}>
+            <MaterialIcons name="close" size={28} color="white" />
+          </TouchableOpacity>
         </View>
       </Modal>
     </View>
@@ -181,18 +188,24 @@ export default function CustomerHome() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8f9fa', paddingTop: 60 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, marginBottom: 20 },
-  title: { fontSize: 24, fontWeight: '800', color: '#333' },
-  iconBtn: { padding: 5 },
-  list: { paddingBottom: 20, paddingHorizontal: 20 },
-  sectionTitle: { fontSize: 18, fontWeight: '600', marginBottom: 15, color: '#555', paddingHorizontal: 20 },
-  
-  mapContainer: { flex: 1 },
-  map: { width: Dimensions.get('window').width, height: Dimensions.get('window').height },
-  closeBtn: { position: 'absolute', top: 50, left: 20, zIndex: 1, backgroundColor: 'white', padding: 10, borderRadius: 25, flexDirection: 'row', alignItems: 'center', gap: 5, elevation: 5 },
-  closeText: { fontWeight: 'bold' },
+  container: { flex: 1, backgroundColor: "white" },
+  loader: { flex: 1, justifyContent: "center", alignItems: "center" },
 
-  distBadge: { position: 'absolute', right: 10, top: 10, backgroundColor: 'rgba(0,0,0,0.05)', padding: 5, borderRadius: 5 },
-  distText: { fontSize: 10, fontWeight: 'bold', color: '#555' }
+  header: {
+    padding: 20,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+
+  title: { fontSize: 22, fontWeight: "700", color: "#111" },
+
+  closeMapBtn: {
+    position: "absolute",
+    top: 40,
+    right: 20,
+    backgroundColor: "black",
+    padding: 10,
+    borderRadius: 40,
+  },
 });

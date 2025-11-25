@@ -1,64 +1,86 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 
-// Define the shape of a Shop object
+// Main Shop type
 export interface Shop {
   id: string;
   name: string;
   isOpen: boolean;
-  address?: string; // Optional for now
+  latitude?: number;
+  longitude?: number;
+  distance?: number;
 }
 
-interface ShopCardProps {
+export interface ShopCardProps {
   shop: Shop;
+  onPress?: () => void;
 }
 
-export default function ShopCard({ shop }: ShopCardProps) {
+export default function ShopCard({ shop, onPress }: ShopCardProps) {
   return (
-    <View style={styles.card}>
-      <View style={styles.cardHeader}>
-        <Text style={styles.shopName}>{shop.name}</Text>
-        
-        {/* Dynamic Badge based on status */}
-        <View style={[
-          styles.badge, 
-          { backgroundColor: shop.isOpen ? '#e8f5e9' : '#ffebee' }
-        ]}>
-          <Text style={{
-            color: shop.isOpen ? '#2e7d32' : '#c62828', 
-            fontSize: 10, 
-            fontWeight: 'bold'
-          }}>
+    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.8}>
+
+      <View style={{ flex: 1 }}>
+        {/* SHOP NAME */}
+        <Text style={styles.name}>{shop.name}</Text>
+
+        {/* OPEN / CLOSED BADGE */}
+        <View
+          style={[
+            styles.badge,
+            { backgroundColor: shop.isOpen ? "#dcfce7" : "#fee2e2" }
+          ]}
+        >
+          <Text
+            style={{
+              color: shop.isOpen ? "#15803d" : "#b91c1c",
+              fontWeight: "bold",
+              fontSize: 12,
+            }}
+          >
             {shop.isOpen ? "OPEN" : "CLOSED"}
           </Text>
         </View>
+
+        {/* DISTANCE */}
+        {shop.distance !== undefined && (
+          <Text style={styles.distance}>{shop.distance.toFixed(1)} km away</Text>
+        )}
       </View>
-      
-      <Text style={styles.address}>
-        {shop.address || "Local Shop • India"}
-      </Text>
-    </View>
+
+      <MaterialIcons name="chevron-right" size={28} color="#888" />
+    </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
-  card: { 
-    backgroundColor: '#fff', 
-    padding: 15, 
-    borderRadius: 12, 
-    marginBottom: 10, 
-    shadowColor: '#000', 
-    shadowOpacity: 0.05, 
-    shadowRadius: 5, 
-    elevation: 2 
+  card: {
+    backgroundColor: "white",
+    padding: 16,
+    marginBottom: 12,
+    borderRadius: 14,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    elevation: 2,
   },
-  cardHeader: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
-    marginBottom: 5 
+  name: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#111",
   },
-  shopName: { fontSize: 16, fontWeight: '700', color: '#333' },
-  badge: { paddingVertical: 4, paddingHorizontal: 8, borderRadius: 4 },
-  address: { color: '#888', fontSize: 12 }
+  badge: {
+    marginTop: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+    alignSelf: "flex-start",
+  },
+  distance: {
+    marginTop: 6,
+    fontSize: 13,
+    color: "#64748b",
+    fontWeight: "500",
+  },
 });
