@@ -91,7 +91,9 @@
       "eas": {
         "projectId": "d549055d-bb5f-4e9e-a325-37df2e6cc89f"
       },
-      "MAPTILER_KEY": "Pgf9L8n8GrmAIeaUA5fp"
+      "MAPTILER_KEY": "Pgf9L8n8GrmAIeaUA5fp",
+      "DEMAND_API_URL": "https://demandai-api.onrender.com",
+      "EXPO_PUBLIC_GEMINI_KEY": "AIzaSyC-dyZJXWtpor3ieMy8pPWnd4ZHMFMOmsk"
     }
   }
 }

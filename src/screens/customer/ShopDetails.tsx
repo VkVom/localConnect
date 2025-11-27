@@ -29,7 +29,7 @@ export default function ShopDetails() {
   const [reviewModalVisible, setReviewModalVisible] = useState(false);
 
   // --------------------------
-  // FEATURE 1: CALL SHOP OWNER
+  // CALL SHOP OWNER
   // --------------------------
   const callShop = () => {
     if (!shop.phone) {
@@ -40,7 +40,7 @@ export default function ShopDetails() {
   };
 
   // --------------------------
-  // FEATURE 2: GET DIRECTIONS
+  // GET DIRECTIONS
   // --------------------------
   const openDirections = () => {
     if (!shop.latitude || !shop.longitude) {
@@ -74,6 +74,7 @@ export default function ShopDetails() {
 
   return (
     <View style={styles.container}>
+      
       {/* HEADER */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
@@ -99,7 +100,6 @@ export default function ShopDetails() {
       {/* CONTENT */}
       <View style={styles.content}>
 
-        {/* Distance + Call */}
         <View style={styles.infoRow}>
           <Text style={styles.distance}>
             {shop.distance ? `${shop.distance.toFixed(1)} km away` : "Nearby"}
@@ -110,7 +110,7 @@ export default function ShopDetails() {
           </TouchableOpacity>
         </View>
 
-        {/* GET DIRECTIONS BUTTON */}
+        {/* GET DIRECTIONS */}
         <TouchableOpacity style={styles.directionBtn} onPress={openDirections}>
           <MaterialIcons name="directions" size={20} color="white" />
           <Text style={styles.directionText}>Get Directions</Text>
@@ -122,25 +122,42 @@ export default function ShopDetails() {
         <FlatList
           data={products}
           keyExtractor={i => i.id}
-          ListEmptyComponent={
-            <Text style={styles.emptyText}>No products listed yet.</Text>
-          }
+          ListEmptyComponent={<Text style={styles.emptyText}>No products listed yet.</Text>}
+          
           renderItem={({ item }) => (
-            <View style={styles.productCard}>
+            <View
+              style={[
+                styles.productCard,
+                item.outOfStock && styles.cardOut
+              ]}
+            >
               <View>
-                <Text style={styles.prodName}>{item.name}</Text>
-                <Text style={styles.prodCategory}>{item.category || 'General'}</Text>
+                <Text style={[
+                  styles.prodName,
+                  item.outOfStock && styles.textOut
+                ]}>
+                  {item.name}
+                </Text>
+
+                <Text style={styles.prodCategory}>
+                  {item.category || 'General'}
+                </Text>
+
+                {item.outOfStock && (
+                  <Text style={styles.outOfStockLabel}>OUT OF STOCK</Text>
+                )}
               </View>
-              <Text style={styles.prodPrice}>₹{item.price}</Text>
+
+              {!item.outOfStock && (
+                <Text style={styles.prodPrice}>₹{item.price}</Text>
+              )}
             </View>
           )}
 
-          // REVIEWS FOOTER
           ListFooterComponent={
             <View style={styles.reviewsContainer}>
               <View style={styles.reviewHeader}>
                 <Text style={styles.sectionTitle}>Reviews</Text>
-
                 <TouchableOpacity onPress={() => setReviewModalVisible(true)}>
                   <Text style={styles.writeReviewText}>Write Review</Text>
                 </TouchableOpacity>
@@ -153,13 +170,11 @@ export default function ShopDetails() {
                   <View key={review.id} style={styles.reviewCard}>
                     <View style={{flexDirection: 'row', justifyContent: 'space-between'}}>
                       <Text style={{fontWeight: 'bold'}}>{review.userName}</Text>
-
                       <View style={{flexDirection: 'row'}}>
                         <Text style={{marginRight: 4}}>{review.rating}</Text>
                         <MaterialIcons name="star" size={16} color="#fbbf24" />
                       </View>
                     </View>
-
                     <Text style={{color: '#64748b', marginTop: 5}}>
                       {review.comment}
                     </Text>
@@ -171,7 +186,6 @@ export default function ShopDetails() {
         />
       </View>
 
-      {/* REVIEW MODAL */}
       <ReviewModal
         visible={reviewModalVisible}
         onClose={() => setReviewModalVisible(false)}
@@ -184,52 +198,17 @@ export default function ShopDetails() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8fafc' },
 
-  header: { 
-    backgroundColor: '#0f172a', 
-    padding: 20, 
-    paddingTop: 60, 
-    paddingBottom: 30 
-  },
-
+  header: { backgroundColor: '#0f172a', padding: 20, paddingTop: 60, paddingBottom: 30 },
   backBtn: { marginBottom: 15 },
+  shopName: { fontSize: 28, fontWeight: 'bold', color: 'white', marginBottom: 10 },
+  
+  badge: { alignSelf: 'flex-start', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8 },
 
-  shopName: { 
-    fontSize: 28, 
-    fontWeight: 'bold', 
-    color: 'white', 
-    marginBottom: 10 
-  },
+  content: { flex: 1, padding: 20, marginTop: -20, backgroundColor: '#f8fafc', borderTopLeftRadius: 24, borderTopRightRadius: 24 },
 
-  badge: { 
-    alignSelf: 'flex-start', 
-    paddingVertical: 6, 
-    paddingHorizontal: 12, 
-    borderRadius: 8 
-  },
+  infoRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 25 },
+  distance: { fontSize: 16, color: '#64748b', fontWeight: '600' },
 
-  content: { 
-    flex: 1, 
-    padding: 20, 
-    marginTop: -20, 
-    backgroundColor: '#f8fafc',
-    borderTopLeftRadius: 24, 
-    borderTopRightRadius: 24 
-  },
-
-  infoRow: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
-    marginBottom: 25 
-  },
-
-  distance: { 
-    fontSize: 16, 
-    color: '#64748b', 
-    fontWeight: '600' 
-  },
-
-  // GET DIRECTIONS BUTTON
   directionBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -240,77 +219,24 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
     marginBottom: 20,
   },
+  directionText: { color: "white", fontWeight: "600", marginLeft: 8 },
 
-  directionText: {
-    color: "white",
-    fontWeight: "600",
-    marginLeft: 8,
-  },
+  sectionTitle: { fontSize: 18, fontWeight: '700', color: '#334155', marginBottom: 15 },
+  
+  productCard: { padding: 16, backgroundColor: 'white', borderRadius: 12, marginBottom: 10 },
+  prodName: { fontSize: 16, fontWeight: '600', color: '#0f172a' },
+  prodCategory: { fontSize: 12, color: '#94a3b8' },
+  prodPrice: { fontSize: 16, fontWeight: '700', color: '#2563eb', marginTop: 8 },
 
-  sectionTitle: { 
-    fontSize: 18, 
-    fontWeight: '700', 
-    color: '#334155', 
-    marginBottom: 15 
-  },
+  // New Out of Stock styles
+  textOut: { color: "#9ca3af" },
+  cardOut: { opacity: 0.6, backgroundColor: "#f3f4f6" },
+  outOfStockLabel: { marginTop: 8, color: "#b91c1c", fontWeight: "700" },
 
-  productCard: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
-    backgroundColor: 'white', 
-    padding: 16, 
-    borderRadius: 12, 
-    marginBottom: 10, 
-    elevation: 1 
-  },
+  emptyText: { textAlign: 'center', color: '#94a3b8', marginTop: 20, marginBottom: 20 },
 
-  prodName: { 
-    fontSize: 16, 
-    fontWeight: '600', 
-    color: '#0f172a' 
-  },
-
-  prodCategory: { 
-    fontSize: 12, 
-    color: '#94a3b8' 
-  },
-
-  prodPrice: { 
-    fontSize: 16, 
-    fontWeight: '700', 
-    color: '#2563eb' 
-  },
-
-  emptyText: { 
-    textAlign: 'center', 
-    color: '#94a3b8', 
-    marginTop: 20, 
-    marginBottom: 20 
-  },
-
-  reviewsContainer: { 
-    marginTop: 30, 
-    paddingBottom: 40 
-  },
-
-  reviewHeader: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
-    marginBottom: 15 
-  },
-
-  writeReviewText: { 
-    color: '#2563eb', 
-    fontWeight: 'bold' 
-  },
-
-  reviewCard: { 
-    backgroundColor: 'white', 
-    padding: 15, 
-    borderRadius: 10, 
-    marginBottom: 10, 
-    elevation: 1 
-  },
+  reviewsContainer: { marginTop: 30, paddingBottom: 40 },
+  reviewHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 15 },
+  writeReviewText: { color: '#2563eb', fontWeight: 'bold' },
+  reviewCard: { backgroundColor: 'white', padding: 15, borderRadius: 10, marginBottom: 10 },
 });
